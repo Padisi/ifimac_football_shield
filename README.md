@@ -43,4 +43,5 @@ edited `parameters.json` / `palette.json`. It is published by
 `.github/workflows/pages.yml` on every push to `main` (*Settings → Pages → Source:
 GitHub Actions*). To try it locally run
 `python3 -m http.server 8000` and open http://localhost:8000 (opening the file
-directly does not work: browsers block `fetch` from `file://`).
+directly does not work: browsers block `fetch` from `file://`). `.nojekyll` stops
+Jekyll from hiding files that start with `_` if Pages deploys from a branch.
