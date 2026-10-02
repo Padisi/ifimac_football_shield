@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IFIMAC Shield Generator</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --fg: #1d2330; --muted: #667085;
+    --border: #d9dde5; --accent: #0077c8; --accent-fg: #ffffff; --err: #c0262d;
+    --canvas: repeating-conic-gradient(#eef0f3 0% 25%, #ffffff 0% 50%) 50% / 20px 20px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --panel: #1b2029; --fg: #e6e9ef; --muted: #98a2b3;
+      --border: #2e3542; --accent: #3a9be0; --accent-fg: #0b0e13; --err: #ff6b6b;
+      --canvas: repeating-conic-gradient(#20252f 0% 25%, #1a1e26 0% 50%) 50% / 20px 20px;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex;
+           align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; }
+  #status { color: var(--muted); font-size: 13px; }
+  #status.error { color: var(--err); white-space: pre-wrap; }
+  main { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } #preview { order: -1; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  #controls { padding: 4px 12px 12px; max-height: calc(100vh - 100px); overflow-y: auto; }
+  @media (max-width: 800px) { #controls { max-height: none; } }
+  details { border-bottom: 1px solid var(--border); padding: 6px 0; }
+  details:last-child { border-bottom: 0; }
+  summary { cursor: pointer; font-weight: 600; padding: 6px 0; text-transform: capitalize; }
+  .row { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 8px; margin: 5px 0; }
+  .row label { font-family: ui-monospace, monospace; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
+  .row .hint { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; margin-top: -4px; }
+  .inputs { display: flex; gap: 6px; min-width: 0; }
+  input[type=text], input[type=number] { width: 100%; min-width: 0; padding: 5px 7px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--fg); font: inherit; font-size: 13px; }
+  input[type=color] { width: 38px; height: 30px; padding: 0; border: 1px solid var(--border);
+    border-radius: 6px; background: none; flex: none; }
+  input[type=checkbox] { justify-self: start; }
+  button { padding: 7px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel);
+           color: var(--fg); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px; border-bottom: 1px solid var(--border); }
+  .toolbar label { display: flex; gap: 5px; align-items: center; color: var(--muted); }
+  #preview { display: flex; flex-direction: column; min-width: 0; }
+  #canvas { flex: 1; display: grid; place-items: center; padding: 16px; background: var(--canvas);
+            border-radius: 0 0 10px 10px; min-height: 300px; }
+  #canvas svg { width: 100%; max-width: 640px; height: auto; }
+  .file { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>IFIMAC shield generator</h1>
+  <span id="status">Loading Python (Pyodide)… first load takes a little while.</span>
+</header>
+<main>
+  <section class="panel" id="controls"></section>
+  <section class="panel" id="preview">
+    <div class="toolbar">
+      <button class="primary" id="render" disabled>Render</button>
+      <label><input type="checkbox" id="auto" checked> Auto-render</label>
+      <button id="dl-svg" disabled>Download SVG</button>
+      <button id="dl-params">parameters.json</button>
+      <button id="dl-palette">palette.json</button>
+      <button id="load-json">Load JSON…</button>
+      <button id="reset">Reset</button>
+      <input type="file" class="file" id="file" accept=".json,application/json">
+    </div>
+    <div id="canvas"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const status = (msg, err = false) => { const el = $("#status"); el.textContent = msg; el.classList.toggle("error", err); };
+
+// --- JSON with // comments (same rules as include/config.py) ---------------------------
+function stripComments(text) {
+  let out = "", inStr = false, esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) { out += c; if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; }
+    else if (c === '"') { inStr = true; out += c; }
+    else if (text.startsWith("//", i)) { while (i < text.length && text[i] !== "\n") i++; out += "\n"; }
+    else out += c;
+  }
+  return out;
+}
+// Collect the trailing comment of each "key": line, keyed by "section.key", to use as hints
+function extractHints(text) {
+  const hints = {}, stack = [];
+  for (const line of text.split("\n")) {
+    const m = line.match(/^\s*"([^"]+)"\s*:\s*(\{)?.*?(?:\/\/\s*(.*))?$/);
+    if (m) {
+      const path = [...stack, m[1]].join(".");
+      if (m[3]) hints[path] = m[3];
+      if (m[2]) stack.push(m[1]);
+    } else if (/^\s*\}/.test(line)) stack.pop();
+  }
+  return hints;
+}
+
+// --- State -----------------------------------------------------------------------------
+let defaults = {}, params = {}, palette = {}, hints = {}, paramsText = "", paletteText = "";
+let pyodide = null, lastSVG = null, busy = false, pending = false, timer = null;
+
+// --- Form ------------------------------------------------------------------------------
+function makeRow(label, hint, input) {
+  const row = document.createElement("div"); row.className = "row";
+  const l = document.createElement("label"); l.textContent = label; l.title = label;
+  row.append(l, input);
+  if (hint) { const h = document.createElement("div"); h.className = "hint"; h.textContent = hint; row.append(h); }
+  return row;
+}
+function valueInput(value, set) {
+  // null (e.g. seed) is edited as an empty number field
+  const typeOf = v => v === null ? "number" : typeof v;
+  if (Array.isArray(value)) {
+    const wrap = document.createElement("div"); wrap.className = "inputs";
+    value.forEach((v, i) => wrap.append(valueInput(v, nv => { value[i] = nv; set(value); })));
+    return wrap;
+  }
+  const inp = document.createElement("input");
+  if (typeof value === "boolean") {
+    inp.type = "checkbox"; inp.checked = value;
+    inp.onchange = () => set(inp.checked);
+  } else if (typeOf(value) === "number") {
+    inp.type = "number"; inp.step = "any"; inp.value = value ?? ""; inp.placeholder = "null";
+    inp.oninput = () => { if (inp.value === "") set(null); else if (!isNaN(inp.valueAsNumber)) set(inp.valueAsNumber); };
+  } else {
+    inp.type = "text"; inp.value = value;
+    inp.oninput = () => set(inp.value);
+  }
+  return inp;
+}
+function colorInput(key) {
+  const wrap = document.createElement("div"); wrap.className = "inputs";
+  const pick = document.createElement("input"); pick.type = "color";
+  const text = document.createElement("input"); text.type = "text";
+  const sync = () => { text.value = palette[key]; const m = /^#([0-9a-f]{6})/i.exec(palette[key]); if (m) pick.value = "#" + m[1].toLowerCase(); };
+  // The picker has no alpha: keep any alpha suffix the text already had
+  pick.oninput = () => { const a = /^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(palette[key]); palette[key] = pick.value + (a ? a[1] : ""); text.value = palette[key]; changed(); };
+  text.oninput = () => { if (/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(text.value)) { palette[key] = text.value; sync(); changed(); } };
+  sync(); wrap.append(pick, text);
+  return wrap;
+}
+function buildForm() {
+  const root = $("#controls"); root.replaceChildren();
+  const pal = document.createElement("details"); pal.open = true;
+  pal.innerHTML = "<summary>palette</summary>";
+  for (const key of Object.keys(palette)) pal.append(makeRow(key, hints["palette." + key], colorInput(key)));
+  root.append(pal);
+  for (const [section, obj] of Object.entries(params)) {
+    const d = document.createElement("details"); d.open = section === "text";
+    d.innerHTML = `<summary>${section}</summary>`;
+    for (const key of Object.keys(obj)) {
+      if (section === "figure" && key === "filename") continue;  // output is always SVG here
+      d.append(makeRow(key, hints[section + "." + key], valueInput(structuredClone(obj[key]), v => { obj[key] = structuredClone(v); changed(); })));
+    }
+    root.append(d);
+  }
+}
+
+// --- Rendering -------------------------------------------------------------------------
+function changed() {
+  if (!$("#auto").checked || !pyodide) return;
+  clearTimeout(timer); timer = setTimeout(render, 400);
+}
+async function render() {
+  if (!pyodide) return;
+  if (busy) { pending = true; return; }
+  busy = true; $("#render").disabled = true; status("Rendering…");
+  const t0 = performance.now();
+  try {
+    pyodide.globals.set("params_json", JSON.stringify(params));
+    pyodide.globals.set("palette_json", JSON.stringify(palette));
+    lastSVG = await pyodide.runPythonAsync(`
+import io, json
+import matplotlib.pyplot as plt
+from shield import draw_shield
+fig, _ = draw_shield(json.loads(params_json), json.loads(palette_json))
+buf = io.StringIO()
+fig.savefig(buf, format="svg")
+plt.close(fig)
+buf.getvalue()
+`);
+    $("#canvas").innerHTML = lastSVG.slice(lastSVG.indexOf("<svg"));
+    $("#dl-svg").disabled = false;
+    status(`Rendered in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+  } catch (e) {
+    status(String(e.message || e).trim().split("\n").slice(-3).join("\n"), true);
+  } finally {
+    busy = false; $("#render").disabled = false;
+    if (pending) { pending = false; render(); }
+  }
+}
+
+// --- Files -----------------------------------------------------------------------------
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("#render").onclick = render;
+$("#auto").onchange = changed;
+$("#dl-svg").onclick = () => download(params.figure.filename || "IFIMAC_shield.svg", lastSVG, "image/svg+xml");
+$("#dl-params").onclick = () => download("parameters.json", JSON.stringify(params, null, 4) + "\n", "application/json");
+$("#dl-palette").onclick = () => download("palette.json", JSON.stringify(palette, null, 4) + "\n", "application/json");
+$("#reset").onclick = () => { params = structuredClone(defaults.params); palette = structuredClone(defaults.palette); buildForm(); changed(); };
+$("#load-json").onclick = () => $("#file").click();
+$("#file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const obj = JSON.parse(stripComments(await f.text()));
+    // A palette is a flat map of strings; anything else is a parameters file
+    if (Object.values(obj).every(v => typeof v === "string")) palette = obj; else params = obj;
+    buildForm(); changed();
+  } catch (err) { status("Could not read " + f.name + ": " + err.message, true); }
+};
+
+// --- Boot ------------------------------------------------------------------------------
+const PY_FILES = ["shield.py", "include/__init__.py", "include/c60.py", "include/config.py",
+                  "include/curves.py", "include/hexagons.py", "parameters.json", "palette.json"];
+const fetchText = async p => { const r = await fetch(p); if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.text(); };
+
+(async () => {
+  try {
+    [paramsText, paletteText] = await Promise.all(["parameters.json", "palette.json"].map(fetchText));
+    params = JSON.parse(stripComments(paramsText)); palette = JSON.parse(stripComments(paletteText));
+    hints = { ...extractHints(paramsText) };
+    for (const [k, v] of Object.entries(extractHints(paletteText))) hints["palette." + k] = v;
+    defaults = { params: structuredClone(params), palette: structuredClone(palette) };
+    buildForm();
+
+    const files = await Promise.all(PY_FILES.map(async p => [p, await fetchText(p)]));
+    const py = await loadPyodide();
+    status("Loading numpy, matplotlib and ASE…");
+    await py.loadPackage(["numpy", "matplotlib", "scipy", "micropip"]);
+    await py.pyimport("micropip").install("ase");
+    py.FS.mkdirTree("/shield/include");
+    for (const [p, text] of files) py.FS.writeFile("/shield/" + p, text);
+    py.runPython("import sys, os; sys.path.insert(0, '/shield'); os.chdir('/shield')");
+    pyodide = py;  // only now is it ready to render
+    await render();
+  } catch (e) {
+    if (location.protocol === "file:")
+      status("Browsers block loading files from a file:// page. Serve the folder instead:\n" +
+             "python3 -m http.server 8000   then open http://localhost:8000", true);
+    else status("Failed to start: " + (e.message || e), true);
+  }
+})();
+</script>
+</body>
+</html>
