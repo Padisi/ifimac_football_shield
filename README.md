@@ -39,8 +39,8 @@ not standard JSON, so `config.py` strips them before parsing.
 (numpy, matplotlib and ASE compiled to WebAssembly), so it works on GitHub Pages
 with no server. It loads the repository's own `shield.py`, `include/` and JSON
 files, lets you edit every parameter and colour, and downloads the SVG and the
-edited `parameters.json` / `palette.json`. To publish it: *Settings → Pages →
-Deploy from a branch → main / (root)*. To try it locally run
+edited `parameters.json` / `palette.json`. It is published by
+`.github/workflows/pages.yml` on every push to `main` (*Settings → Pages → Source:
+GitHub Actions*). To try it locally run
 `python3 -m http.server 8000` and open http://localhost:8000 (opening the file
-directly does not work: browsers block `fetch` from `file://`). `.nojekyll` is needed so that
-`include/__init__.py` is served.
+directly does not work: browsers block `fetch` from `file://`).
