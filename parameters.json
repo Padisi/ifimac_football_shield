@@ -1,0 +1,81 @@
+// Drawing parameters of the IFIMAC shield.
+// Distances are in data units (the shield lives in [-extent, extent]^2).
+// Line widths (lw, outline), font sizes (fs) and marker sizes (s) are in points for a
+// figure of ref_figsize inches, and are rescaled automatically with figsize, so the
+// logo looks identical at any size.
+// Comments starting with // are allowed; they are stripped by config.py.
+{
+    "figure": {
+        "ref_figsize": 5,                  // reference figure size (inches) for point-based sizes
+        "figsize": [12, 12],               // figure size (inches): [width, height]
+        "extent": 30,                      // axis limits: [-extent, extent] on both axes
+        "filename": "IFIMAC_shield.svg",   // default output file; the extension sets the format
+        "seed": null                       // RNG seed for the AFM substrate (null = different every run)
+    },
+    "hexagon": {
+        "R": 25,               // outer hexagon radius (centre to vertex)
+        "r_ratio": 0.775,      // inner hexagon radius = R * r_ratio
+        "rim": 0.0,            // thickness of the gold rim around the hexagons
+        "gap": 10.5,           // height of the horizontal band between the top and bottom halves
+        "lw": 0.5              // black edge line width (pt)
+    },
+    "circles": {
+        "r": 1.0,              // radius of the circles on the vertices
+        "ratio": 0.8,          // fraction of each side left uncovered by the line, from each end
+        "lw": 1.0,             // white line width between circles, also the circles' edge width (pt)
+        "outline": 1.0,        // extra black outline width on each side of those lines (pt)
+        "gap_margin": 0.0      // extra margin on each side of the year boxes (data units)
+    },
+    "text": {
+        "title": "IFIMAC",            // central title
+        "title_fs": 36,               // title font size (pt)
+        "shadow_offset": [0.6, -0.6], // (dx, dy) of the title shadow; the years use half of it
+        "years": ["20", "24"],        // [left, right] text on the vertical sides
+        "year_fs": 14,                // year font size (pt)
+        "year_inset": 0.02,           // distance from the outer edge to the years, as a fraction of R
+        "year_pad": 0.1               // padding of the box around the years (fraction of font size)
+    },
+    "wave": {
+        "A": 2.5,                 // wave packet amplitude
+        "gamma": 0.2,             // Gaussian envelope decay rate
+        "w": 5,                   // angular frequency of the carrier
+        "half_length": 5,         // the packet spans x in [-half_length, half_length] before rotation
+        "n": 1000,                // number of sampled points
+        "angle": 30,              // rotation of the packet (degrees, counter-clockwise)
+        "center": [-8, 10],       // centre of the packet
+        "lw": 1.0,                // white line width (pt)
+        "outline": 1.0,           // extra black outline width (pt)
+        "qubit_s": 100,           // size of the end markers (two-level systems), pt^2
+        "qubit_lw": 1.0,          // edge width of the markers and of their level lines (pt)
+        "level_half_width": 0.5,  // half-width of the level lines inside the markers
+        "level_dy": 0.4           // vertical distance of each level from the marker centre
+    },
+    "afm": {
+        "center_x": 8.3,          // horizontal shift of the whole AFM drawing
+        "sub_half_length": 7,     // the substrate spans x in [-sub_half_length, sub_half_length]
+        "sub_y": 7,               // mean height of the substrate
+        "sub_A": 1,               // total amplitude of the substrate roughness
+        "sub_n_modes": 10,        // number of random sine modes summed for the substrate
+        "sub_max_freq": 12,       // maximum frequency of those modes (exclusive)
+        "sub_n": 1000,            // number of sampled points of the substrate
+        "sub_lw": 1.0,            // substrate line width (pt)
+        "sub_outline": 1.0,       // extra black outline width of the substrate (pt)
+        "cant_x": [-6, 5],        // [start, end] x of the cantilever (before the center_x shift)
+        "cant_y": 10,             // height of the cantilever's free end
+        "cant_alpha": 31,         // initial slope of the cantilever at its fixed end (degrees)
+        "cant_lw": 4.0,           // cantilever line width (pt)
+        "cant_outline": 1.0,      // extra black outline width of the cantilever (pt)
+        "tip_width": 2.0,         // width of the triangular tip
+        "tip_height": 2.5,        // height of the triangular tip
+        "tip_lw": 0.5             // edge width of the tip (pt)
+    },
+    "c60": {
+        "center": [0, -11.5],     // centre of the fullerene
+        "radius": 1.5,            // scale factor applied to the atomic positions
+        "theta": 300,             // rotation around the x axis (degrees)
+        "phi": 0,                 // rotation around the z axis (degrees)
+        "cutoff": 0.77,           // covalent radius used to detect bonds (Å, before scaling)
+        "lw": 1.0,                // white bond line width (pt)
+        "outline": 0.5            // extra black outline width of the bonds (pt)
+    }
+}

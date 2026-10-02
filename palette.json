@@ -1,0 +1,12 @@
+// Colour palette of the shield (hex RGB or RGBA).
+// Comments starting with // are allowed; they are stripped by config.py.
+{
+    "red": "#ED1B24",           // outer hexagon fill
+    "black": "#000000",         // outlines, shadows and two-level system lines
+    "white": "#FFFFFF",         // top-right quarter, wave packet, vertex circles, C60 bonds
+    "gold": "#FFD700",          // rim behind the hexagons (visible when hexagon.rim > 0)
+    "green": "#4a7729",         // bottom half of the inner hexagon
+    "blue": "#0077c8",          // top-left quarter, AFM substrate, cantilever and tip
+    "text": "#FFFFFF",          // "IFIMAC" title and years
+    "transparent": "#00000000"  // invisible fills/edges (year boxes, inner hexagon outline)
+}
